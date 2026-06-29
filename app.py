@@ -6,14 +6,13 @@ app = Flask(__name__)
 # ---------------------------
 # DATABASE CONNECTION
 # ---------------------------
-def get_db():
-    return mysql.connector.connect(
-        host="mysql-4gx.railway.internal",
-        user="root",
-        password="TREUQuawNtwlzjNPYqxJyGuSedPdEGhK",
-        database="railway",
-        port=3306
-    )
+db = mysql.connector.connect(
+    host="PUBLIC_RAILWAY_HOST",
+    user="root",
+    password="YOUR_PASSWORD",
+    database="railway",
+    port=3306
+)
 
 # ---------------------------
 # HOME / LOGIN
