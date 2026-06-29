@@ -6,16 +6,17 @@ app = Flask(__name__)
 # ---------------------------
 # DATABASE CONNECTION
 # ---------------------------
-db = mysql.connector.connect(
-    host="reseau.proxy.rlwy.net",
-    user="root",
-    password="TREUQuawNtwlzjNPYqxJyGuSedPdEGhK",
-    database="railway",
-    port=53503
-)
+def get_db():
+    return mysql.connector.connect(
+        host="reseau.proxy.rlwy.net",
+        user="root",
+        password="TREUQuawNtwlzjNPYqxJyGuSedPdEGhK",
+        database="railway",
+        port=53503
+    )
 
 # ---------------------------
-# HOME / LOGIN
+# LOGIN
 # ---------------------------
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -28,8 +29,10 @@ def login():
         email = request.form['email']
         password = request.form['password']
 
-        sql = "SELECT * FROM faculty WHERE email=%s AND password=%s"
-        cursor.execute(sql, (email, password))
+        cursor.execute(
+            "SELECT * FROM faculty WHERE email=%s AND password=%s",
+            (email, password)
+        )
 
         user = cursor.fetchone()
 
@@ -60,12 +63,11 @@ def register():
         department = request.form['department']
         password = request.form['password']
 
-        sql = """
-        INSERT INTO faculty (name, email, department, password)
-        VALUES (%s, %s, %s, %s)
-        """
+        cursor.execute(
+            "INSERT INTO faculty (name, email, department, password) VALUES (%s, %s, %s, %s)",
+            (name, email, department, password)
+        )
 
-        cursor.execute(sql, (name, email, department, password))
         db.commit()
 
         cursor.close()
@@ -94,13 +96,11 @@ def apply_leave():
         to_date = request.form['to_date']
         reason = request.form['reason']
 
-        sql = """
-        INSERT INTO leave_requests
-        (faculty_name, department, leave_type, from_date, to_date, reason, status)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """
-
-        cursor.execute(sql, (
+        cursor.execute("""
+            INSERT INTO leave_requests
+            (faculty_name, department, leave_type, from_date, to_date, reason, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
             faculty_name,
             department,
             leave_type,
@@ -141,19 +141,16 @@ def admin():
 
         if department:
 
-            sql = """
-            SELECT name FROM faculty
-            WHERE department=%s AND name != %s
-            LIMIT 1
-            """
+            cursor.execute("""
+                SELECT name FROM faculty
+                WHERE department=%s AND name != %s
+                LIMIT 1
+            """, (department, faculty_name))
 
-            cursor.execute(sql, (department, faculty_name))
             substitute = cursor.fetchone()
 
-            if substitute:
-                suggestions[leave[0]] = substitute[0]
-            else:
-                suggestions[leave[0]] = "No Substitute Found"
+            suggestions[leave[0]] = substitute[0] if substitute else "No Substitute Found"
+
         else:
             suggestions[leave[0]] = "-"
 
