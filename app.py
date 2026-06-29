@@ -7,11 +7,11 @@ app = Flask(__name__)
 # DATABASE CONNECTION
 # ---------------------------
 db = mysql.connector.connect(
-    host="PUBLIC_RAILWAY_HOST",
+    host="reseau.proxy.rlwy.net",
     user="root",
-    password="YOUR_PASSWORD",
+    password="TREUQuawNtwlzjNPYqxJyGuSedPdEGhK",
     database="railway",
-    port=3306
+    port=53503
 )
 
 # ---------------------------
