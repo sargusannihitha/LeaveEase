@@ -12,9 +12,7 @@ def get_db():
         user="root",
         password="TREUQuawNtwlzjNPYqxJyGuSedPdEGhK",
         database="railway",
-        port=53503,
-        connection_timeout=10,
-        autocommit=True
+        port=53503
     )
 
 # ---------------------------
@@ -22,29 +20,31 @@ def get_db():
 # ---------------------------
 @app.route('/', methods=['GET', 'POST'])
 def login():
-
     if request.method == 'POST':
+        try:
+            db = get_db()
+            cursor = db.cursor()
 
-        db = get_db()
-        cursor = db.cursor()
+            email = request.form['email']
+            password = request.form['password']
 
-        email = request.form['email']
-        password = request.form['password']
+            cursor.execute(
+                "SELECT * FROM faculty WHERE email=%s AND password=%s",
+                (email, password)
+            )
 
-        cursor.execute(
-            "SELECT * FROM faculty WHERE email=%s AND password=%s",
-            (email, password)
-        )
+            user = cursor.fetchone()
 
-        user = cursor.fetchone()
+            cursor.close()
+            db.close()
 
-        cursor.close()
-        db.close()
+            if user:
+                return render_template('dashboard.html')
+            else:
+                return "Invalid Email or Password"
 
-        if user:
-            return render_template('dashboard.html')
-        else:
-            return "Invalid Email or Password"
+        except Exception as e:
+            return f"Error: {str(e)}"
 
     return render_template('login.html')
 
@@ -54,28 +54,29 @@ def login():
 # ---------------------------
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-
     if request.method == 'POST':
+        try:
+            db = get_db()
+            cursor = db.cursor()
 
-        db = get_db()
-        cursor = db.cursor()
+            name = request.form['name']
+            email = request.form['email']
+            department = request.form['department']
+            password = request.form['password']
 
-        name = request.form['name']
-        email = request.form['email']
-        department = request.form['department']
-        password = request.form['password']
+            cursor.execute(
+                "INSERT INTO faculty (name, email, department, password) VALUES (%s, %s, %s, %s)",
+                (name, email, department, password)
+            )
 
-        cursor.execute(
-            "INSERT INTO faculty (name, email, department, password) VALUES (%s, %s, %s, %s)",
-            (name, email, department, password)
-        )
+            db.commit()
+            cursor.close()
+            db.close()
 
-        db.commit()
+            return "Registration Successful!"
 
-        cursor.close()
-        db.close()
-
-        return "Registration Successful!"
+        except Exception as e:
+            return f"Error: {str(e)}"
 
     return render_template('register.html')
 
@@ -85,39 +86,40 @@ def register():
 # ---------------------------
 @app.route('/apply_leave', methods=['GET', 'POST'])
 def apply_leave():
-
     if request.method == 'POST':
+        try:
+            db = get_db()
+            cursor = db.cursor()
 
-        db = get_db()
-        cursor = db.cursor()
+            faculty_name = request.form['faculty_name']
+            department = request.form['department']
+            leave_type = request.form['leave_type']
+            from_date = request.form['from_date']
+            to_date = request.form['to_date']
+            reason = request.form['reason']
 
-        faculty_name = request.form['faculty_name']
-        department = request.form['department']
-        leave_type = request.form['leave_type']
-        from_date = request.form['from_date']
-        to_date = request.form['to_date']
-        reason = request.form['reason']
+            cursor.execute("""
+                INSERT INTO leave_requests
+                (faculty_name, department, leave_type, from_date, to_date, reason, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                faculty_name,
+                department,
+                leave_type,
+                from_date,
+                to_date,
+                reason,
+                "Pending"
+            ))
 
-        cursor.execute("""
-            INSERT INTO leave_requests
-            (faculty_name, department, leave_type, from_date, to_date, reason, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (
-            faculty_name,
-            department,
-            leave_type,
-            from_date,
-            to_date,
-            reason,
-            "Pending"
-        ))
+            db.commit()
+            cursor.close()
+            db.close()
 
-        db.commit()
+            return "Leave Applied Successfully!"
 
-        cursor.close()
-        db.close()
-
-        return "Leave Applied Successfully!"
+        except Exception as e:
+            return f"Error: {str(e)}"
 
     return render_template('apply_leave.html')
 
@@ -127,39 +129,38 @@ def apply_leave():
 # ---------------------------
 @app.route('/admin')
 def admin():
+    try:
+        db = get_db()
+        cursor = db.cursor()
 
-    db = get_db()
-    cursor = db.cursor()
+        cursor.execute("SELECT * FROM leave_requests")
+        leaves = cursor.fetchall()
 
-    cursor.execute("SELECT * FROM leave_requests")
-    leaves = cursor.fetchall()
+        suggestions = {}
 
-    suggestions = {}
+        for leave in leaves:
+            department = leave[2]
+            faculty_name = leave[1]
 
-    for leave in leaves:
+            if department:
+                cursor.execute("""
+                    SELECT name FROM faculty
+                    WHERE department=%s AND name != %s
+                    LIMIT 1
+                """, (department, faculty_name))
 
-        department = leave[7]
-        faculty_name = leave[1]
+                substitute = cursor.fetchone()
+                suggestions[leave[0]] = substitute[0] if substitute else "No Substitute Found"
+            else:
+                suggestions[leave[0]] = "-"
 
-        if department:
+        cursor.close()
+        db.close()
 
-            cursor.execute("""
-                SELECT name FROM faculty
-                WHERE department=%s AND name != %s
-                LIMIT 1
-            """, (department, faculty_name))
+        return render_template('admin.html', leaves=leaves, suggestions=suggestions)
 
-            substitute = cursor.fetchone()
-
-            suggestions[leave[0]] = substitute[0] if substitute else "No Substitute Found"
-
-        else:
-            suggestions[leave[0]] = "-"
-
-    cursor.close()
-    db.close()
-
-    return render_template('admin.html', leaves=leaves, suggestions=suggestions)
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 # ---------------------------
@@ -167,7 +168,6 @@ def admin():
 # ---------------------------
 @app.route('/approve/<int:id>')
 def approve(id):
-
     db = get_db()
     cursor = db.cursor()
 
@@ -188,7 +188,6 @@ def approve(id):
 # ---------------------------
 @app.route('/reject/<int:id>')
 def reject(id):
-
     db = get_db()
     cursor = db.cursor()
 
@@ -209,7 +208,6 @@ def reject(id):
 # ---------------------------
 @app.route('/history')
 def history():
-
     db = get_db()
     cursor = db.cursor()
 
@@ -234,4 +232,4 @@ def logout():
 # RUN APP
 # ---------------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
