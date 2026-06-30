@@ -12,7 +12,9 @@ def get_db():
         user="root",
         password="TREUQuawNtwlzjNPYqxJyGuSedPdEGhK",
         database="railway",
-        port=53503
+        port=53503,
+        connection_timeout=10,
+        autocommit=True
     )
 
 # ---------------------------
