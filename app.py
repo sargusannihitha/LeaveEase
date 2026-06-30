@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect
-import mysql.connector
+import sqlite3
 
 app = Flask(__name__)
 
@@ -7,13 +7,44 @@ app = Flask(__name__)
 # DATABASE CONNECTION
 # ---------------------------
 def get_db():
-    return mysql.connector.connect(
-        host="reseau.proxy.rlwy.net",
-        user="root",
-        password="TREUQuawNtwlzjNPYqxJyGuSedPdEGhK",
-        database="railway",
-        port=53503
+    conn = sqlite3.connect("leaveease.db")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+# ---------------------------
+# CREATE TABLES AUTOMATICALLY
+# ---------------------------
+def init_db():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS faculty (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        email TEXT,
+        department TEXT,
+        password TEXT
     )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS leave_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        faculty_name TEXT,
+        department TEXT,
+        leave_type TEXT,
+        from_date TEXT,
+        to_date TEXT,
+        reason TEXT,
+        status TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
 
 # ---------------------------
 # LOGIN
@@ -29,13 +60,12 @@ def login():
             password = request.form['password']
 
             cursor.execute(
-                "SELECT * FROM faculty WHERE email=%s AND password=%s",
+                "SELECT * FROM faculty WHERE email=? AND password=?",
                 (email, password)
             )
 
             user = cursor.fetchone()
 
-            cursor.close()
             db.close()
 
             if user:
@@ -65,12 +95,11 @@ def register():
             password = request.form['password']
 
             cursor.execute(
-                "INSERT INTO faculty (name, email, department, password) VALUES (%s, %s, %s, %s)",
+                "INSERT INTO faculty (name, email, department, password) VALUES (?, ?, ?, ?)",
                 (name, email, department, password)
             )
 
             db.commit()
-            cursor.close()
             db.close()
 
             return "Registration Successful!"
@@ -101,7 +130,7 @@ def apply_leave():
             cursor.execute("""
                 INSERT INTO leave_requests
                 (faculty_name, department, leave_type, from_date, to_date, reason, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
                 faculty_name,
                 department,
@@ -113,7 +142,6 @@ def apply_leave():
             ))
 
             db.commit()
-            cursor.close()
             db.close()
 
             return "Leave Applied Successfully!"
@@ -139,22 +167,19 @@ def admin():
         suggestions = {}
 
         for leave in leaves:
-            department = leave[2]
-            faculty_name = leave[1]
+            department = leave["department"]
+            faculty_name = leave["faculty_name"]
 
-            if department:
-                cursor.execute("""
-                    SELECT name FROM faculty
-                    WHERE department=%s AND name != %s
-                    LIMIT 1
-                """, (department, faculty_name))
+            cursor.execute("""
+                SELECT name FROM faculty
+                WHERE department=? AND name != ?
+                LIMIT 1
+            """, (department, faculty_name))
 
-                substitute = cursor.fetchone()
-                suggestions[leave[0]] = substitute[0] if substitute else "No Substitute Found"
-            else:
-                suggestions[leave[0]] = "-"
+            substitute = cursor.fetchone()
 
-        cursor.close()
+            suggestions[leave["id"]] = substitute["name"] if substitute else "No Substitute Found"
+
         db.close()
 
         return render_template('admin.html', leaves=leaves, suggestions=suggestions)
@@ -172,12 +197,11 @@ def approve(id):
     cursor = db.cursor()
 
     cursor.execute(
-        "UPDATE leave_requests SET status='Approved' WHERE id=%s",
+        "UPDATE leave_requests SET status='Approved' WHERE id=?",
         (id,)
     )
 
     db.commit()
-    cursor.close()
     db.close()
 
     return redirect('/admin')
@@ -192,12 +216,11 @@ def reject(id):
     cursor = db.cursor()
 
     cursor.execute(
-        "UPDATE leave_requests SET status='Rejected' WHERE id=%s",
+        "UPDATE leave_requests SET status='Rejected' WHERE id=?",
         (id,)
     )
 
     db.commit()
-    cursor.close()
     db.close()
 
     return redirect('/admin')
@@ -214,7 +237,6 @@ def history():
     cursor.execute("SELECT * FROM leave_requests")
     leaves = cursor.fetchall()
 
-    cursor.close()
     db.close()
 
     return render_template('history.html', leaves=leaves)
@@ -232,4 +254,5 @@ def logout():
 # RUN APP
 # ---------------------------
 if __name__ == "__main__":
+    init_db()
     app.run()
